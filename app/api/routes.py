@@ -5,12 +5,19 @@ This module implements ``POST /api/interview`` on top of the existing
 and interview components. The router is built by :func:`create_router` so the
 LLM provider can be injected — tests inject fake providers, while
 ``app.main`` injects the real provider.
+
+A small, centralized exception-handling layer maps domain and provider errors
+to clean JSON responses so internal details never leak to the client.
 """
 
 from fastapi import APIRouter, HTTPException
 
 from app.api.models import InterviewRequest, InterviewResponse
-from app.api.session_manager import SessionManager, SessionNotFoundError
+from app.api.session_manager import (
+    SessionAlreadyExistsError,
+    SessionManager,
+    SessionNotFoundError,
+)
 from app.context import InterviewContext, build_interview_context
 from app.interview import (
     AnswerEvaluator,
@@ -18,11 +25,18 @@ from app.interview import (
     FeedbackGenerator,
     FollowUpGenerator,
     InterviewEngine,
+    InterviewError,
     QuestionGenerator,
 )
 from app.llm.base import LLMProvider
+from app.llm.errors import LLMError
 from app.loaders.curriculum import load_curriculum
 from app.models.curriculum import Curriculum
+
+# Generic message returned to the client when the LLM provider fails.
+_LLM_UNAVAILABLE_DETAIL = (
+    "The AI service is temporarily unavailable. Please try again later."
+)
 
 
 def create_router(
@@ -54,12 +68,28 @@ def create_router(
     @router.post("/api/interview", response_model=InterviewResponse)
     def interview(request: InterviewRequest) -> InterviewResponse:
         """Handle one turn of an interview session."""
+        try:
+            return _handle_interview(request)
+        except SessionNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from None
+        except SessionAlreadyExistsError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from None
+        except EngineError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        except InterviewError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        except LLMError:
+            # Provider failures become a controlled 500; internal details are
+            # never exposed to the client.
+            raise HTTPException(status_code=500, detail=_LLM_UNAVAILABLE_DETAIL) from None
+
+    def _handle_interview(request: InterviewRequest) -> InterviewResponse:
+        """Core interview logic (no error mapping)."""
         if request.candidate is not None:
             # ------------------------- Initial request -------------------------
             if sessions.has_session(request.sessionId):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Session '{request.sessionId}' already exists.",
+                raise SessionAlreadyExistsError(
+                    f"Session '{request.sessionId}' already exists."
                 )
 
             context = build_interview_context(request.candidate, curriculum_data)
@@ -85,18 +115,8 @@ def create_router(
             )
 
         # ------------------------ Subsequent request --------------------------
-        try:
-            engine = sessions.get_session(request.sessionId)
-        except SessionNotFoundError:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session '{request.sessionId}' not found.",
-            ) from None
-
-        try:
-            turn = engine.submit_answer(request.message or "")
-        except EngineError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from None
+        engine = sessions.get_session(request.sessionId)
+        turn = engine.submit_answer(request.message or "")
 
         if not turn.done:
             if turn.question is None:

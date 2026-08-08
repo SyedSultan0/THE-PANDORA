@@ -1,3 +1,4 @@
+
 """Tests for the POST /api/interview FastAPI endpoint.
 
 No real Gemini/API calls are made — a fake LLMProvider is injected into the
@@ -20,7 +21,9 @@ from app.interview.prompts import (
     FOLLOW_UP_SYSTEM_PROMPT,
     QUESTION_SYSTEM_PROMPT,
 )
+from app.interview.errors import QuestionValidationError
 from app.llm.base import LLMProvider
+from app.llm.errors import LLMGenerationError
 from app.loaders.candidates import load_candidates
 from app.loaders.curriculum import load_curriculum
 
@@ -36,8 +39,15 @@ class FakeLLMProvider(LLMProvider):
     def __init__(self) -> None:
         self.question_calls = 0
         self.feedback_calls = 0
+        self.fail_with: Exception | None = None
+
+    def _maybe_fail(self) -> None:
+        """Raise a configured failure before returning a response."""
+        if self.fail_with is not None:
+            raise self.fail_with
 
     def generate(self, prompt: str) -> str:
+        self._maybe_fail()
         if FEEDBACK_SYSTEM_PROMPT in prompt:
             self.feedback_calls += 1
             return json.dumps(
@@ -111,7 +121,7 @@ def api() -> SimpleNamespace:
     )
     client = TestClient(app)
 
-    return SimpleNamespace(client=client, sessions=sessions)
+    return SimpleNamespace(client=client, sessions=sessions, llm=llm)
 
 
 @pytest.fixture
@@ -211,3 +221,40 @@ class TestCompletion:
         assert isinstance(data["feedback"]["strengths"], list)
         assert isinstance(data["feedback"]["gaps"], list)
         assert isinstance(data["feedback"]["next"], list)
+
+
+class TestErrorHandling:
+    """Tests for the centralized API exception-handling layer."""
+
+    def test_error_responses_contain_detail(self, api) -> None:
+        response = api.client.post(
+            "/api/interview", json={"sessionId": "sess-detail", "message": "Hello."}
+        )
+        assert response.status_code == 404
+        assert "detail" in response.json()
+
+    def test_domain_validation_failure_returns_400(self, api, candidate_payload) -> None:
+        # A QuestionValidationError (an InterviewError) raised during start()
+        # must be mapped to a clean HTTP 400.
+        api.llm.fail_with = QuestionValidationError("invalid question output")
+        response = _start(api.client, "sess-domain", candidate_payload)
+        assert response.status_code == 400
+        assert "detail" in response.json()
+
+    def test_llm_error_returns_controlled_500(self, api, candidate_payload) -> None:
+        api.llm.fail_with = LLMGenerationError("provider exploded")
+        response = _start(api.client, "sess-llm", candidate_payload)
+        assert response.status_code == 500
+        data = response.json()
+        assert "detail" in data
+        # Internal provider details must not leak.
+        assert "exploded" not in data["detail"]
+
+    def test_successful_flow_still_works(self, api, candidate_payload) -> None:
+        response = _start(api.client, "sess-flow", candidate_payload)
+        assert response.status_code == 200
+        response = api.client.post(
+            "/api/interview", json={"sessionId": "sess-flow", "message": "Answer."}
+        )
+        assert response.status_code == 200
+        assert response.json()["done"] is False
