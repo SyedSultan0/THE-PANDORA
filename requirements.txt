@@ -1,5 +1,7 @@
 fastapi==0.115.6
 pydantic==2.13.4
+google-genai==2.17.0
+python-dotenv==1.2.2
 uvicorn[standard]==0.34.0
 pytest==8.3.4
 httpx==0.28.1
