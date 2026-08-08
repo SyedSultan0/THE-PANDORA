@@ -2,11 +2,16 @@
 
 from fastapi import FastAPI
 
+from app.api.routes import create_router
+from app.llm import GeminiProvider
+
 app = FastAPI(
     title="AI Interview Agent",
     description="Backend API for the AI Interview Agent hackathon project.",
     version="0.1.0",
 )
+
+app.include_router(create_router(llm=GeminiProvider()))
 
 
 @app.get("/")
