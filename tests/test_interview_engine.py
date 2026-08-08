@@ -125,6 +125,8 @@ def _make_engine(
     state: EngineState | None = None,
     min_questions: int = 8,
     min_days: int = 4,
+    max_questions: int = 15,
+    max_follow_up_streak: int = 3,
 ) -> InterviewEngine:
     return InterviewEngine(
         question_generator=FakeQuestionGenerator(),
@@ -133,6 +135,8 @@ def _make_engine(
         context=context,
         min_questions=min_questions,
         min_days=min_days,
+        max_questions=max_questions,
+        max_follow_up_streak=max_follow_up_streak,
         state=state,
     )
 
@@ -495,6 +499,86 @@ class TestCompletion:
 
         with pytest.raises(EngineError, match="after the interview is complete"):
             engine.submit_answer("Too late.")
+
+
+class TestMaxBoundary:
+    """Tests for the bounded-interview termination behavior."""
+
+    def test_interview_eventually_terminates_with_feedback_blocked_days(self, small_context) -> None:
+        """Even when curriculum coverage can never reach 4 days, the engine
+        terminates at the max question boundary instead of running forever."""
+        engine = _make_engine(small_context)
+        engine.start()
+        # small_context has only 2 distinct days; min_days=4 can never be met.
+        # 14 submits: each presents a new question (max 15 not yet reached).
+        for _ in range(14):
+            turn = engine.submit_answer("Answer.")
+            assert turn.done is False  # not done during the boundary window
+            assert engine.state.status == "WAITING_FOR_ANSWER"
+
+        # The 15th answer reaches the max boundary (question_count == 15).
+        turn = engine.submit_answer("Answer.")
+        assert turn.done is True
+        assert engine.state.status == "COMPLETED"
+        assert engine.state.question_count == 15
+
+    def test_no_question_after_completion(self, small_context) -> None:
+        engine = _make_engine(small_context)
+        engine.start()
+        for _ in range(14):
+            engine.submit_answer("Answer.")
+        # The 15th answer reaches the max boundary and completes.
+        turn = engine.submit_answer("Answer.")
+        assert turn.done is True
+        assert turn.question is None
+
+        with pytest.raises(EngineError, match="after the interview is complete"):
+            engine.submit_answer("Too late.")
+
+    def test_max_boundary_respects_question_count(self, small_context) -> None:
+        """The max boundary is based on question_count and applies even when
+        min_days can never be reached (no infinite loop)."""
+        engine = _make_engine(small_context, min_questions=2, min_days=4, max_questions=8)
+        engine.start()
+        for _ in range(7):
+            engine.submit_answer("Answer.")
+        # The 8th submit sees question_count == 8 and completes.
+        turn = engine.submit_answer("Answer.")
+        assert turn.done is True
+        assert engine.state.question_count == 8
+
+    def test_follow_up_streak_is_capped(self, real_context) -> None:
+        """Consecutive follow-ups on the same day stop after the cap."""
+        engine = _make_engine(
+            real_context,
+            evaluations=[
+                _eval(correctness="PARTIAL", score=5),
+                _eval(correctness="PARTIAL", score=5),
+                _eval(correctness="PARTIAL", score=5),
+                _eval(correctness="PARTIAL", score=5),
+            ],
+        )
+        engine.start()  # main question (count=1)
+        follow_ups = 0
+        for _ in range(4):
+            turn = engine.submit_answer("Partial answer.")
+            if turn.is_follow_up:
+                follow_ups += 1
+        # Cap is 3; the 4th should be a new main question.
+        assert follow_ups == 3
+        assert engine.state.follow_up_streak == 0
+
+    def test_normal_completion_still_works(self, real_context) -> None:
+        """The existing happy path (8 answers, 4+ days) still completes."""
+        engine = _make_engine(real_context)
+        engine.start()
+        for _ in range(7):
+            turn = engine.submit_answer("Answer.")
+            assert turn.done is False
+        turn = engine.submit_answer("Final answer.")
+        assert turn.done is True
+        assert engine.state.status == "COMPLETED"
+        assert turn.question is None
 
 
 class TestStateSerialization:

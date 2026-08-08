@@ -222,6 +222,59 @@ class TestCompletion:
         assert isinstance(data["feedback"]["gaps"], list)
         assert isinstance(data["feedback"]["next"], list)
 
+    def test_interview_terminates_within_max_boundary(self, api, candidate_payload) -> None:
+        """The interview must terminate within the max question boundary and
+        return the structured final response — it can never run unbounded."""
+        _start(api.client, "sess-bounded", candidate_payload)
+
+        done_response = None
+        for _ in range(20):  # safety cap well above the 15-question max
+            response = api.client.post(
+                "/api/interview",
+                json={"sessionId": "sess-bounded", "message": "Answer."},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            if data["done"] is True:
+                done_response = data
+                break
+
+        assert done_response is not None, "Interview did not terminate within the max boundary"
+        assert done_response["done"] is True
+        assert done_response["feedback"] is not None
+        assert done_response["feedback"]["summary"]
+        assert isinstance(done_response["feedback"]["strengths"], list)
+        assert isinstance(done_response["feedback"]["gaps"], list)
+        assert isinstance(done_response["feedback"]["next"], list)
+
+    def test_no_question_generated_after_completion(self, api, candidate_payload) -> None:
+        """After done=true, submitting another answer must be rejected — no
+        further interview question is generated."""
+        _start(api.client, "sess-after", candidate_payload)
+
+        done_response = None
+        for _ in range(20):
+            response = api.client.post(
+                "/api/interview",
+                json={"sessionId": "sess-after", "message": "Answer."},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            if data["done"] is True:
+                done_response = data
+                break
+
+        assert done_response is not None
+        assert done_response["done"] is True
+
+        # Submitting after completion must be rejected (engine error → 400).
+        response = api.client.post(
+            "/api/interview",
+            json={"sessionId": "sess-after", "message": "Too late."},
+        )
+        assert response.status_code == 400
+        assert "detail" in response.json()
+
 
 class TestErrorHandling:
     """Tests for the centralized API exception-handling layer."""

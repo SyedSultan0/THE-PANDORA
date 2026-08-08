@@ -5,8 +5,8 @@
  * components stay free of fetch/API logic.
  *
  * The service converts network failures, HTTP errors, and malformed
- * responses into clean, user-facing error messages. Raw stack traces and
- * internal backend details are never surfaced.
+ * responses into clean, user-facing error messages. Raw stack traces,
+ * API keys, and internal backend details are never surfaced.
  */
 
 // Default to same-origin so the Vite dev proxy (see vite.config.js) handles
@@ -18,42 +18,19 @@ const GENERIC_ERROR = "The interview service is unavailable. Please try again.";
 const NETWORK_ERROR = "Unable to reach the interview service. Please check your connection and try again.";
 
 /**
- * Build a full Candidate payload matching the backend Candidate model.
- *
- * The backend requires a structured candidate (member + missions + signals).
- * The frontend form collects name, job role, years of experience, and
- * education; the remaining required fields are filled with sensible defaults.
- */
-function buildCandidatePayload({ name, jobRole, yearsExperience, education }) {
-  return {
-    member: {
-      id: `candidate-${Date.now()}`,
-      name,
-      jobRole,
-      yearsExperience: Number(yearsExperience) || 0,
-      education: education?.trim() || "",
-      status: "ACTIVE",
-    },
-    missions: [],
-    signals: {
-      commitDays: 0,
-      missionsCompleted: 0,
-      missionsFirstTry: 0,
-    },
-  };
-}
-
-/**
  * Start a new interview session.
  *
+ * The candidate object is the REAL supplied candidate profile from
+ * candidate.json — the frontend does not invent candidate fields.
+ *
  * @param {string} sessionId - Client-generated unique session id.
- * @param {{name: string, jobRole: string, yearsExperience: string, education: string}} candidate
+ * @param {object} candidate - The real candidate profile object.
  * @returns {Promise<{reply: string, done: boolean, feedback: object|null}>}
  */
 export async function startInterview(sessionId, candidate) {
   const data = await postInterview({
     sessionId,
-    candidate: buildCandidatePayload(candidate),
+    candidate,
   });
   return validateInterviewResponse(data);
 }

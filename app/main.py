@@ -1,9 +1,30 @@
 """AI Interview Agent - FastAPI application entry point."""
 
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.api.routes import create_router
-from app.llm import GeminiProvider
+from app.llm import GeminiProvider, OpenRouterProvider
+from app.llm.base import LLMProvider
+
+# Load environment variables from the root .env file (e.g. GEMINI_API_KEY,
+# OPENROUTER_API_KEY). Existing environment variables take precedence; the
+# .env file is local and is excluded from version control via .gitignore.
+load_dotenv()
+
+
+def build_llm_provider() -> LLMProvider:
+    """Select the LLM provider based on the local configuration.
+
+    OpenRouter is used when ``OPENROUTER_API_KEY`` is configured; otherwise
+    Gemini is used as the fallback.
+    """
+    if os.getenv("OPENROUTER_API_KEY"):
+        return OpenRouterProvider()
+    return GeminiProvider()
+
 
 app = FastAPI(
     title="AI Interview Agent",
@@ -11,7 +32,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-app.include_router(create_router(llm=GeminiProvider()))
+app.include_router(create_router(llm=build_llm_provider()))
 
 
 @app.get(

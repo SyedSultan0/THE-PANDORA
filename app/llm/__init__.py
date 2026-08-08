@@ -11,12 +11,15 @@ from app.llm.errors import (
     LLMGenerationError,
 )
 from app.llm.gemini import DEFAULT_GEMINI_MODEL, GeminiProvider
+from app.llm.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterProvider
 
 __all__ = [
     "DEFAULT_GEMINI_MODEL",
+    "DEFAULT_OPENROUTER_MODEL",
     "GeminiProvider",
     "LLMConfigurationError",
     "LLMError",
     "LLMGenerationError",
     "LLMProvider",
+    "OpenRouterProvider",
 ]

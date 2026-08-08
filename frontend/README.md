@@ -80,12 +80,16 @@ The production bundle is output to `frontend/dist/`.
 
 ## Notes
 
-- The frontend generates a unique `sessionId` when an interview starts and
-  reuses it for every subsequent answer.
-- The initial request sends the candidate payload (`member` + `missions` +
-  `signals`); subsequent requests send only the `sessionId` and the
-  candidate's `message`.
+- The frontend loads the REAL supplied candidate profiles from
+  `src/data/candidates.json` (a copy of the organizer's `data/candidates.json`).
+  The start screen presents a candidate selector — the frontend never invents
+  candidate fields or profiles.
+- The initial request sends the selected REAL candidate object (`member` +
+  `missions` + `signals`); subsequent requests send only the `sessionId` and
+  the candidate's `message`.
 - The backend is the source of truth for questions, follow-ups, evaluation,
   difficulty, interview state, and completion.
 - The interview completes when the backend returns `done: true` with a
   `feedback` object (`summary`, `strengths`, `gaps`, `next`).
+- The Gemini API key belongs ONLY to the backend (`GEMINI_API_KEY` in the
+  backend environment). No API key is ever placed in the frontend.

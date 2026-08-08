@@ -15,6 +15,8 @@ from app.interview.question_generator import QuestionGenerator
 
 MIN_QUESTIONS = 8
 MIN_DAYS_COVERED = 4
+MAX_QUESTIONS = 15
+MAX_FOLLOW_UP_STREAK = 3
 
 _DIFFICULTY_ORDER = ("easy", "medium", "hard")
 
@@ -35,6 +37,8 @@ class InterviewEngine:
         *,
         min_questions: int = MIN_QUESTIONS,
         min_days: int = MIN_DAYS_COVERED,
+        max_questions: int = MAX_QUESTIONS,
+        max_follow_up_streak: int = MAX_FOLLOW_UP_STREAK,
         state: EngineState | None = None,
     ) -> None:
         self._question_generator = question_generator
@@ -43,6 +47,8 @@ class InterviewEngine:
         self._context = context
         self._min_questions = min_questions
         self._min_days = min_days
+        self._max_questions = max_questions
+        self._max_follow_up_streak = max_follow_up_streak
         self._state = state if state is not None else EngineState()
 
     # ------------------------------------------------------------------
@@ -194,6 +200,10 @@ class InterviewEngine:
         self._state.current_question = question
         if question.curriculum_day is not None:
             self._state.days_covered.add(question.curriculum_day)
+        # Track the consecutive follow-up streak; a main question resets it.
+        self._state.follow_up_streak = (
+            self._state.follow_up_streak + 1 if is_follow_up else 0
+        )
         self._state.status = "WAITING_FOR_ANSWER"
 
     def _build_turn(
@@ -209,19 +219,34 @@ class InterviewEngine:
         )
 
     def _is_complete(self) -> bool:
-        """Return True when both minimum requirements are satisfied."""
-        return (
+        """Return True when the interview should finish.
+
+        The interview completes when BOTH minimum requirements are satisfied
+        (at least ``min_questions`` answered and at least ``min_days`` distinct
+        curriculum days covered), OR when the hard maximum question boundary is
+        reached so the interview can never run unbounded.
+        """
+        minimums_met = (
             len(self._state.answers) >= self._min_questions
             and len(self._state.days_covered) >= self._min_days
         )
+        max_reached = self._state.question_count >= self._max_questions
+        return minimums_met or max_reached
 
     # ------------------------------------------------------------------
     # Policies
     # ------------------------------------------------------------------
 
     def _should_follow_up(self, evaluation: EvaluationResult) -> bool:
-        """Decide whether a follow-up is appropriate for this evaluation."""
-        return evaluation.correctness in {"INCORRECT", "PARTIAL"}
+        """Decide whether a follow-up is appropriate for this evaluation.
+
+        A follow-up is generated only when the answer is INCORRECT or PARTIAL
+        AND the consecutive follow-up streak has not reached the configured
+        cap. This prevents an unbounded chain of follow-ups on the same topic.
+        """
+        if evaluation.correctness not in {"INCORRECT", "PARTIAL"}:
+            return False
+        return self._state.follow_up_streak < self._max_follow_up_streak
 
     def _updated_difficulty(
         self, current: Difficulty, evaluation: EvaluationResult

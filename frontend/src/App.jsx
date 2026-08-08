@@ -3,6 +3,7 @@ import SessionStart from "./components/SessionStart.jsx";
 import InterviewSection from "./components/InterviewSection.jsx";
 import CompletionCard from "./components/CompletionCard.jsx";
 import { startInterview, submitAnswer } from "./services/api.js";
+import { getCandidateById } from "./services/candidates.js";
 
 /** Generate a unique session id for a new interview. */
 function generateSessionId() {
@@ -11,12 +12,7 @@ function generateSessionId() {
 
 export default function App() {
   const [phase, setPhase] = useState("start"); // 'start' | 'interview' | 'done'
-  const [candidate, setCandidate] = useState({
-    name: "",
-    jobRole: "",
-    yearsExperience: "",
-    education: "",
-  });
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -27,6 +23,11 @@ export default function App() {
 
   const startInterviewFlow = async () => {
     if (busyRef.current) return; // Prevent duplicate submissions.
+    const candidate = getCandidateById(selectedCandidateId);
+    if (!candidate) {
+      setError("Please select a candidate profile to begin.");
+      return;
+    }
     busyRef.current = true;
     setError("");
     setIsThinking(true);
@@ -89,8 +90,8 @@ export default function App() {
       <main className="app-main">
         {phase === "start" && (
           <SessionStart
-            candidate={candidate}
-            onCandidateChange={setCandidate}
+            selectedCandidateId={selectedCandidateId}
+            onSelectCandidate={setSelectedCandidateId}
             onStart={startInterviewFlow}
             isStarting={isThinking}
           />
