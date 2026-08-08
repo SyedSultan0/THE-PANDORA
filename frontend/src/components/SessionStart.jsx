@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function SessionStart({ candidate, onCandidateChange, onStart }) {
+export default function SessionStart({ candidate, onCandidateChange, onStart, isStarting }) {
   const [errors, setErrors] = useState({});
 
   const handleChange = (field) => (event) => {
@@ -43,6 +43,7 @@ export default function SessionStart({ candidate, onCandidateChange, onStart }) 
           onChange={handleChange("name")}
           placeholder="e.g. Sarah Johnson"
           autoComplete="name"
+          disabled={isStarting}
           aria-invalid={Boolean(errors.name)}
           aria-describedby={errors.name ? "candidate-name-error" : undefined}
         />
@@ -63,6 +64,7 @@ export default function SessionStart({ candidate, onCandidateChange, onStart }) 
           value={candidate.jobRole}
           onChange={handleChange("jobRole")}
           placeholder="e.g. Data Engineer"
+          disabled={isStarting}
           aria-invalid={Boolean(errors.jobRole)}
           aria-describedby={errors.jobRole ? "candidate-role-error" : undefined}
         />
@@ -82,11 +84,12 @@ export default function SessionStart({ candidate, onCandidateChange, onStart }) 
           value={candidate.yearsExperience}
           onChange={handleChange("yearsExperience")}
           placeholder="e.g. 5"
+          disabled={isStarting}
         />
       </div>
 
-      <button type="button" className="btn btn-primary" onClick={handleStart}>
-        Start Interview
+      <button type="button" className="btn btn-primary" onClick={handleStart} disabled={isStarting}>
+        {isStarting ? "Starting..." : "Start Interview"}
       </button>
     </section>
   );

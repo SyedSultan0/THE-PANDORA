@@ -3,7 +3,6 @@ import { useState } from "react";
 export default function InterviewSection({
   question,
   questionNumber,
-  totalQuestions,
   answer,
   onAnswerChange,
   onSubmit,
@@ -31,18 +30,7 @@ export default function InterviewSection({
     <section className="card interview-section">
       <div className="progress-area" aria-label="Interview progress">
         <div className="progress-header">
-          <span className="progress-label">
-            Question {questionNumber} of {totalQuestions}
-          </span>
-          <span className="progress-percent">
-            {Math.round((questionNumber / totalQuestions) * 100)}%
-          </span>
-        </div>
-        <div className="progress-track">
-          <div
-            className="progress-fill"
-            style={{ width: `${(questionNumber / totalQuestions) * 100}%` }}
-          />
+          <span className="progress-label">Question {questionNumber}</span>
         </div>
       </div>
 
@@ -78,7 +66,7 @@ export default function InterviewSection({
         onClick={handleSubmit}
         disabled={isThinking}
       >
-        Submit Answer
+        {isThinking ? "Submitting..." : "Submit Answer"}
       </button>
 
       {isThinking && (
