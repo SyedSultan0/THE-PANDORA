@@ -9,7 +9,10 @@
  * internal backend details are never surfaced.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// Default to same-origin so the Vite dev proxy (see vite.config.js) handles
+// /api and /health locally. Override with VITE_API_BASE_URL for a different
+// backend origin (e.g. a deployed environment).
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 const GENERIC_ERROR = "The interview service is unavailable. Please try again.";
 const NETWORK_ERROR = "Unable to reach the interview service. Please check your connection and try again.";
@@ -18,17 +21,17 @@ const NETWORK_ERROR = "Unable to reach the interview service. Please check your 
  * Build a full Candidate payload matching the backend Candidate model.
  *
  * The backend requires a structured candidate (member + missions + signals).
- * The frontend form only collects name/jobRole/yearsExperience, so the
- * remaining required fields are filled with sensible defaults.
+ * The frontend form collects name, job role, years of experience, and
+ * education; the remaining required fields are filled with sensible defaults.
  */
-function buildCandidatePayload({ name, jobRole, yearsExperience }) {
+function buildCandidatePayload({ name, jobRole, yearsExperience, education }) {
   return {
     member: {
       id: `candidate-${Date.now()}`,
       name,
       jobRole,
       yearsExperience: Number(yearsExperience) || 0,
-      education: "",
+      education: education?.trim() || "",
       status: "ACTIVE",
     },
     missions: [],
@@ -44,7 +47,7 @@ function buildCandidatePayload({ name, jobRole, yearsExperience }) {
  * Start a new interview session.
  *
  * @param {string} sessionId - Client-generated unique session id.
- * @param {{name: string, jobRole: string, yearsExperience: string}} candidate
+ * @param {{name: string, jobRole: string, yearsExperience: string, education: string}} candidate
  * @returns {Promise<{reply: string, done: boolean, feedback: object|null}>}
  */
 export async function startInterview(sessionId, candidate) {

@@ -23,15 +23,39 @@ The development server runs at http://localhost:5173.
 The frontend talks to the FastAPI backend at `POST /api/interview` and
 `GET /health`.
 
-### API base URL
+### Local development (CORS-safe)
 
-The base URL is read from the `VITE_API_BASE_URL` environment variable. When
-not set, it falls back to `http://localhost:8000` for local development.
+During development, Vite proxies `/api` and `/health` to the FastAPI backend
+at `http://localhost:8000` (see `vite.config.js`). This lets the frontend and
+backend run on different origins without needing CORS configuration on the
+backend.
 
-Create a `.env` file in the `frontend/` directory to override it:
+Start the backend first:
 
 ```bash
-VITE_API_BASE_URL=http://localhost:8000
+cd THE-PANDORA
+uvicorn app.main:app --reload --port 8000
+```
+
+Then start the frontend:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open http://localhost:5173.
+
+### API base URL override
+
+For a different backend origin (e.g. a deployed environment), set the
+`VITE_API_BASE_URL` environment variable. When unset, the frontend uses
+same-origin (relying on the Vite dev proxy in development).
+
+Create a `.env` file in the `frontend/` directory:
+
+```bash
+VITE_API_BASE_URL=https://your-backend.example.com
 ```
 
 Do not commit secrets or API keys to the frontend.
@@ -43,6 +67,8 @@ cd frontend
 npm install
 npm run build
 ```
+
+The production bundle is output to `frontend/dist/`.
 
 ## Scripts
 
@@ -56,7 +82,10 @@ npm run build
 
 - The frontend generates a unique `sessionId` when an interview starts and
   reuses it for every subsequent answer.
-- The initial request sends the candidate payload; subsequent requests send
-  only the `sessionId` and the candidate's `message`.
+- The initial request sends the candidate payload (`member` + `missions` +
+  `signals`); subsequent requests send only the `sessionId` and the
+  candidate's `message`.
+- The backend is the source of truth for questions, follow-ups, evaluation,
+  difficulty, interview state, and completion.
 - The interview completes when the backend returns `done: true` with a
   `feedback` object (`summary`, `strengths`, `gaps`, `next`).

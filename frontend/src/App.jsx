@@ -11,10 +11,14 @@ function generateSessionId() {
 
 export default function App() {
   const [phase, setPhase] = useState("start"); // 'start' | 'interview' | 'done'
-  const [candidate, setCandidate] = useState({ name: "", jobRole: "", yearsExperience: "" });
+  const [candidate, setCandidate] = useState({
+    name: "",
+    jobRole: "",
+    yearsExperience: "",
+    education: "",
+  });
   const [sessionId, setSessionId] = useState("");
   const [question, setQuestion] = useState("");
-  const [questionNumber, setQuestionNumber] = useState(1);
   const [answer, setAnswer] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +37,6 @@ export default function App() {
       // Only transition to the interview screen after a successful response.
       setSessionId(newSessionId);
       setQuestion(data.reply);
-      setQuestionNumber(1);
       setAnswer("");
       setPhase("interview");
     } catch (err) {
@@ -59,8 +62,9 @@ export default function App() {
         setFeedback(data.feedback);
         setPhase("done");
       } else {
+        // The backend reply may be a main question or a follow-up; the
+        // backend is the source of truth, so display it as-is.
         setQuestion(data.reply);
-        setQuestionNumber((n) => n + 1);
         // Only clear the answer after a successful response, so the user
         // can retry without retyping on failure.
         setAnswer("");
@@ -95,7 +99,6 @@ export default function App() {
         {phase === "interview" && (
           <InterviewSection
             question={question}
-            questionNumber={questionNumber}
             answer={answer}
             onAnswerChange={setAnswer}
             onSubmit={submitAnswerFlow}

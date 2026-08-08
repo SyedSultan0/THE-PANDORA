@@ -241,6 +241,19 @@ body {
   margin-bottom: 1.5rem;
 }
 
+.interviewer-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  margin-bottom: 0.5rem;
+}
+
 .question-text {
   font-size: 1.1rem;
   margin: 0.35rem 0 0;

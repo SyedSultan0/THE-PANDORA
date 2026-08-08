@@ -88,6 +88,19 @@ export default function SessionStart({ candidate, onCandidateChange, onStart, is
         />
       </div>
 
+      <div className="form-field">
+        <label htmlFor="candidate-education">Education</label>
+        <input
+          id="candidate-education"
+          type="text"
+          value={candidate.education}
+          onChange={handleChange("education")}
+          placeholder="e.g. BS Computer Science"
+          autoComplete="education"
+          disabled={isStarting}
+        />
+      </div>
+
       <button type="button" className="btn btn-primary" onClick={handleStart} disabled={isStarting}>
         {isStarting ? "Starting..." : "Start Interview"}
       </button>
