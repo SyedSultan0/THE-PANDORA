@@ -21,15 +21,9 @@ export default function App() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [error, setError] = useState("");
   const [feedback, setFeedback] = useState(null);
 
   const startInterview = () => {
-    if (!candidate.name.trim() || !candidate.jobRole.trim()) {
-      setError("Please provide your name and job role to begin.");
-      return;
-    }
-    setError("");
     setIsThinking(true);
     // Simulate a brief load before entering the interview screen.
     setTimeout(() => {
@@ -41,14 +35,7 @@ export default function App() {
   };
 
   const submitAnswer = () => {
-    if (!answer.trim()) {
-      setError("Please enter an answer before submitting.");
-      return;
-    }
-    setError("");
-    setAnswer("");
     setIsThinking(true);
-
     // Simulate a mock "next turn" transition.
     setTimeout(() => {
       setIsThinking(false);
@@ -95,8 +82,6 @@ export default function App() {
         )}
 
         {phase === "done" && feedback && <CompletionCard feedback={feedback} />}
-
-        {error && <div className="error-banner" role="alert">{error}</div>}
       </main>
     </div>
   );
