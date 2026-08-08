@@ -4,13 +4,12 @@ The generator depends only on :class:`LLMProvider` and the normalized
 :class:`InterviewContext`; it never imports a concrete provider.
 """
 
-import json
-import re
 from typing import Any
 
 from pydantic import ValidationError
 
 from app.context.models import InterviewContext
+from app.interview._parsing import parse_json_object
 from app.interview.errors import QuestionValidationError
 from app.interview.models import GeneratedQuestion
 from app.interview.prompts import build_question_prompt
@@ -47,43 +46,9 @@ class QuestionGenerator:
         except LLMError:
             raise  # provider errors propagate unchanged
 
-        return self._parse_and_validate(raw, context)
-
-    # ------------------------------------------------------------------
-    # Parsing / validation
-    # ------------------------------------------------------------------
-
-    def _parse_and_validate(
-        self, raw: str, context: InterviewContext
-    ) -> GeneratedQuestion:
-        data = self._parse_json(raw)
-        result = self._build_generated_question(data, context)
-        return result
-
-    def _parse_json(self, raw: str) -> dict[str, Any]:
-        """Parse LLM output into a dict, tolerating markdown fences."""
-        if not raw or not raw.strip():
-            raise QuestionValidationError("LLM returned an empty response.")
-
-        text = raw.strip()
-        # Strip optional ```json ... ``` fences
-        fence_match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.DOTALL)
-        if fence_match:
-            text = fence_match.group(1).strip()
-
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise QuestionValidationError(
-                f"LLM output is not valid JSON: {exc.msg} (line {exc.lineno}, "
-                f"column {exc.colno})."
-            ) from exc
-
-        if not isinstance(data, dict):
-            raise QuestionValidationError(
-                f"LLM output must be a JSON object, got {type(data).__name__}."
-            )
-        return data
+        return self._build_generated_question(
+            parse_json_object(raw, QuestionValidationError), context
+        )
 
     def _build_generated_question(
         self, data: dict[str, Any], context: InterviewContext
