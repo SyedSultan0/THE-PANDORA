@@ -1,0 +1,1 @@
+"""AI Interview Agent - Backend application package."""
