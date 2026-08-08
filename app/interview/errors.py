@@ -11,3 +11,7 @@ class QuestionValidationError(InterviewError):
 
 class EvaluationValidationError(InterviewError):
     """Raised when an evaluation result is invalid or cannot be parsed."""
+
+
+class EngineError(InterviewError):
+    """Raised for invalid interview engine operations."""

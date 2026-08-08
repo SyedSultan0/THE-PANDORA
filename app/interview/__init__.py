@@ -1,11 +1,21 @@
 """Interview engine components.
 
-Currently provides question generation built on the provider-agnostic
+Provides question generation, answer evaluation, follow-up generation, and
+the interview engine state machine — all built on the provider-agnostic
 ``LLMProvider`` abstraction and the normalized ``InterviewContext``.
 """
 
 from app.interview.answer_evaluator import AnswerEvaluator
+from app.interview.engine import MIN_DAYS_COVERED, MIN_QUESTIONS, InterviewEngine
+from app.interview.engine_models import (
+    DIFFICULTY_ORDER,
+    Difficulty,
+    EngineState,
+    EngineStatus,
+    EngineTurn,
+)
 from app.interview.errors import (
+    EngineError,
     EvaluationValidationError,
     InterviewError,
     QuestionValidationError,
@@ -34,6 +44,12 @@ __all__ = [
     "AnswerEvaluator",
     "Confidence",
     "Correctness",
+    "DIFFICULTY_ORDER",
+    "Difficulty",
+    "EngineError",
+    "EngineState",
+    "EngineStatus",
+    "EngineTurn",
     "EvaluationResult",
     "EvaluationValidationError",
     "EVALUATION_OUTPUT_INSTRUCTIONS",
@@ -42,7 +58,10 @@ __all__ = [
     "FOLLOW_UP_SYSTEM_PROMPT",
     "FollowUpGenerator",
     "GeneratedQuestion",
+    "InterviewEngine",
     "InterviewError",
+    "MIN_DAYS_COVERED",
+    "MIN_QUESTIONS",
     "QUESTION_OUTPUT_INSTRUCTIONS",
     "QUESTION_SYSTEM_PROMPT",
     "QuestionGenerator",
