@@ -8,7 +8,7 @@ documented without touching the components.
 import json
 
 from app.context.models import InterviewContext
-from app.interview.models import GeneratedQuestion
+from app.interview.models import EvaluationResult, GeneratedQuestion
 
 QUESTION_SYSTEM_PROMPT = """\
 You are a realistic technical interviewer conducting a one-on-one technical interview.
@@ -87,6 +87,39 @@ The "reasoning" field is required and must be non-empty.
 Do not include any text outside the JSON object.
 """
 
+FOLLOW_UP_SYSTEM_PROMPT = """\
+You are a realistic technical interviewer conducting a one-on-one technical interview.
+
+You must ask exactly ONE follow-up question based on the candidate's previous answer.
+
+Use the original question, the candidate's answer, and the evaluation to decide what to ask:
+- If the answer was partial or had gaps, probe the identified gap or ask for clarification.
+- If the answer was incorrect, clarify foundational understanding.
+- If the answer was strong, deepen the topic or test practical understanding.
+- Consider the candidate's experience and the current difficulty when appropriate.
+
+Rules:
+- Do NOT repeat the original question.
+- Stay on the same topic; do NOT switch to an unrelated topic.
+- Do NOT give away the answer or provide coaching before asking the question.
+- Do NOT invent facts about the candidate.
+- Return ONLY a single JSON object with the exact shape described below.
+"""
+
+FOLLOW_UP_OUTPUT_INSTRUCTIONS = """\
+Return ONLY a valid JSON object with this exact shape:
+
+{
+  "question": "the follow-up question text",
+  "curriculum_day": <integer day number from the supplied context, or null>,
+  "topic": "<short topic label matching the context, or null>",
+  "difficulty": "<easy|medium|hard, or null>"
+}
+
+The "question" field is required and must be non-empty.
+Do not include any text outside the JSON object.
+"""
+
 
 def build_evaluation_prompt(
     question: GeneratedQuestion,
@@ -114,6 +147,51 @@ def build_evaluation_prompt(
         "\n# Output Format\n" + EVALUATION_OUTPUT_INSTRUCTIONS,
     ]
     return "\n".join(sections)
+
+
+def build_follow_up_prompt(
+    question: GeneratedQuestion,
+    answer: str,
+    evaluation: EvaluationResult,
+    context: InterviewContext,
+) -> str:
+    """Build the full follow-up question prompt for the LLM.
+
+    Args:
+        question: The original question the candidate answered.
+        answer: The candidate's answer text.
+        evaluation: The evaluation of the candidate's answer.
+        context: The normalized interview context.
+
+    Returns:
+        A single string prompt combining the system instructions, the
+        original question, the answer, the evaluation, relevant context,
+        and output requirements.
+    """
+    sections = [
+        FOLLOW_UP_SYSTEM_PROMPT,
+        "\n# Original Question\n" + _question_section(question),
+        "\n# Candidate Answer\n" + answer.strip(),
+        "\n# Evaluation\n" + _evaluation_section(evaluation),
+        "\n# Candidate Context\n" + _candidate_section(context),
+        "\n# Relevant Curriculum\n" + _curriculum_days_section(context),
+        "\n# Interview State\n" + _interview_state_section(context),
+        "\n# Output Format\n" + FOLLOW_UP_OUTPUT_INSTRUCTIONS,
+    ]
+    return "\n".join(sections)
+
+
+def _evaluation_section(evaluation: EvaluationResult) -> str:
+    lines = [
+        f"- Score: {evaluation.score}/10",
+        f"- Correctness: {evaluation.correctness}",
+        f"- Strengths: {json.dumps(evaluation.strengths)}",
+        f"- Gaps: {json.dumps(evaluation.gaps)}",
+        f"- Reasoning: {evaluation.reasoning}",
+    ]
+    if evaluation.confidence is not None:
+        lines.append(f"- Confidence: {evaluation.confidence}")
+    return "\n".join(lines)
 
 
 def _question_section(question: GeneratedQuestion) -> str:
