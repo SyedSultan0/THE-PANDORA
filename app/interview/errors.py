@@ -15,3 +15,7 @@ class EvaluationValidationError(InterviewError):
 
 class EngineError(InterviewError):
     """Raised for invalid interview engine operations."""
+
+
+class FeedbackValidationError(InterviewError):
+    """Raised when generated feedback is invalid or cannot be parsed."""

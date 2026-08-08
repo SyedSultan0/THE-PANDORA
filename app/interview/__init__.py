@@ -17,24 +17,30 @@ from app.interview.engine_models import (
 from app.interview.errors import (
     EngineError,
     EvaluationValidationError,
+    FeedbackValidationError,
     InterviewError,
     QuestionValidationError,
 )
+from app.interview.feedback_generator import FeedbackGenerator
 from app.interview.follow_up_generator import FollowUpGenerator
 from app.interview.models import (
     Confidence,
     Correctness,
     EvaluationResult,
+    FeedbackResult,
     GeneratedQuestion,
 )
 from app.interview.prompts import (
     EVALUATION_OUTPUT_INSTRUCTIONS,
     EVALUATION_SYSTEM_PROMPT,
+    FEEDBACK_OUTPUT_INSTRUCTIONS,
+    FEEDBACK_SYSTEM_PROMPT,
     FOLLOW_UP_OUTPUT_INSTRUCTIONS,
     FOLLOW_UP_SYSTEM_PROMPT,
     QUESTION_OUTPUT_INSTRUCTIONS,
     QUESTION_SYSTEM_PROMPT,
     build_evaluation_prompt,
+    build_feedback_prompt,
     build_follow_up_prompt,
     build_question_prompt,
 )
@@ -54,6 +60,11 @@ __all__ = [
     "EvaluationValidationError",
     "EVALUATION_OUTPUT_INSTRUCTIONS",
     "EVALUATION_SYSTEM_PROMPT",
+    "FEEDBACK_OUTPUT_INSTRUCTIONS",
+    "FEEDBACK_SYSTEM_PROMPT",
+    "FeedbackGenerator",
+    "FeedbackResult",
+    "FeedbackValidationError",
     "FOLLOW_UP_OUTPUT_INSTRUCTIONS",
     "FOLLOW_UP_SYSTEM_PROMPT",
     "FollowUpGenerator",
@@ -67,6 +78,7 @@ __all__ = [
     "QuestionGenerator",
     "QuestionValidationError",
     "build_evaluation_prompt",
+    "build_feedback_prompt",
     "build_follow_up_prompt",
     "build_question_prompt",
 ]

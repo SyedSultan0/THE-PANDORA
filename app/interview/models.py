@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Correctness = Literal["CORRECT", "PARTIAL", "INCORRECT"]
 Confidence = Literal["LOW", "MEDIUM", "HIGH"]
@@ -39,3 +39,34 @@ class EvaluationResult(BaseModel):
     gaps: list[str]
     reasoning: str = Field(min_length=1)
     confidence: Confidence | None = None
+
+
+class FeedbackResult(BaseModel):
+    """Final interview feedback for a candidate.
+
+    Aligned with the organizer's required feedback contract:
+
+    .. code-block:: json
+
+        {
+          "summary": "...",
+          "strengths": ["..."],
+          "gaps": ["..."],
+          "next": ["..."]
+        }
+
+    ``summary`` must be a non-empty string. ``strengths``, ``gaps``, and
+    ``next`` are lists of strings.
+    """
+
+    summary: str = Field(min_length=1)
+    strengths: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    next: list[str] = Field(default_factory=list)
+
+    @field_validator("summary")
+    @classmethod
+    def _summary_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("summary must be a non-empty string")
+        return value
