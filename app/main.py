@@ -14,7 +14,27 @@ app = FastAPI(
 app.include_router(create_router(llm=GeminiProvider()))
 
 
-@app.get("/")
+@app.get(
+    "/",
+    summary="Root",
+    description="Basic service information.",
+    response_description="Service status and message.",
+)
 async def root() -> dict[str, str]:
-    """Health check endpoint to verify the server is running."""
+    """Basic service information."""
     return {"status": "ok", "message": "AI Interview Agent API is running"}
+
+
+@app.get(
+    "/health",
+    summary="Health Check",
+    description=(
+        "Liveness probe for deployment health checks. Does not require "
+        "authentication, does not call the LLM, and does not create an "
+        "interview session."
+    ),
+    response_description="Service health status.",
+)
+async def health() -> dict[str, str]:
+    """Liveness health check endpoint."""
+    return {"status": "ok"}

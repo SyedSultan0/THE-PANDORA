@@ -65,7 +65,19 @@ def create_router(
     # same context that drove the interview.
     contexts: dict[str, InterviewContext] = {}
 
-    @router.post("/api/interview", response_model=InterviewResponse)
+    @router.post(
+        "/api/interview",
+        response_model=InterviewResponse,
+        summary="Submit Interview Turn",
+        description=(
+            "Handles one turn of an interview session. An initial request "
+            "includes a 'candidate' payload and starts a new session; a "
+            "subsequent request includes a 'message' and submits the "
+            "candidate's answer. Returns the next question, or the final "
+            "feedback when the interview is complete."
+        ),
+        response_description="The next question, or the final feedback.",
+    )
     def interview(request: InterviewRequest) -> InterviewResponse:
         """Handle one turn of an interview session."""
         try:
