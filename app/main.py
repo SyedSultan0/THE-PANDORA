@@ -4,6 +4,7 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import create_router
 from app.llm import (
@@ -45,6 +46,19 @@ app = FastAPI(
     title="AI Interview Agent",
     description="Backend API for the AI Interview Agent hackathon project.",
     version="0.1.0",
+)
+
+# CORS: allow the Render-hosted frontend and local dev servers to call this API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://the-pandora-frontend.onrender.com",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
 )
 
 app.include_router(create_router(llm=build_llm_provider()))
