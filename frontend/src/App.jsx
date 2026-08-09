@@ -19,6 +19,7 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState(null);
+  const [loadingPhase, setLoadingPhase] = useState("question"); // 'question' | 'feedback'
   const busyRef = useRef(false);
 
   const startInterviewFlow = async () => {
@@ -59,7 +60,8 @@ export default function App() {
     try {
       const data = await submitAnswer(sessionId, submittedAnswer);
       if (data.done) {
-        // Completion: stop asking questions and show the real feedback.
+        // Completion: switch to feedback loading state.
+        setLoadingPhase("feedback");
         setFeedback(data.feedback);
         setPhase("done");
       } else {
@@ -104,6 +106,7 @@ export default function App() {
             onAnswerChange={setAnswer}
             onSubmit={submitAnswerFlow}
             isThinking={isThinking}
+            loadingPhase={loadingPhase}
           />
         )}
 

@@ -1,0 +1,140 @@
+"""Tests for the FailoverLLMProvider.
+
+No real network calls or API keys are used — providers are fakes that raise
+or return scripted responses.
+"""
+
+import pytest
+
+from app.llm import (
+    FailoverLLMProvider,
+    LLMConfigurationError,
+    LLMGenerationError,
+    LLMProvider,
+)
+
+
+class _FakeProvider(LLMProvider):
+    """A scriptable fake provider."""
+
+    def __init__(self, name: str, result: str | None = None, error: Exception | None = None) -> None:
+        self.name = name
+        self.result = result
+        self.error = error
+        self.calls = 0
+
+    def generate(self, prompt: str) -> str:
+        self.calls += 1
+        if self.error is not None:
+            raise self.error
+        assert self.result is not None
+        return self.result
+
+
+def _generation_error(message: str) -> LLMGenerationError:
+    return LLMGenerationError(message)
+
+
+class TestFailover:
+    """Tests for the combined provider failover."""
+
+    def test_nvidia_succeeds_openrouter_never_called(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", result="nvidia-ok")
+        openrouter = _FakeProvider("OpenRouterProvider", result="or-ok")
+
+        provider = FailoverLLMProvider([nvidia, openrouter])
+        result = provider.generate("hi")
+
+        assert result == "nvidia-ok"
+        assert nvidia.calls == 1
+        assert openrouter.calls == 0
+
+    def test_nvidia_429_falls_back_to_openrouter(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=_generation_error("NVIDIA generation failed: HTTP 429"))
+        openrouter = _FakeProvider("OpenRouterProvider", result="or-ok")
+
+        provider = FailoverLLMProvider([nvidia, openrouter])
+        result = provider.generate("hi")
+
+        assert result == "or-ok"
+        assert nvidia.calls == 1
+        assert openrouter.calls == 1
+
+    def test_nvidia_500_falls_back_to_openrouter(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=_generation_error("NVIDIA generation failed: HTTP 500"))
+        openrouter = _FakeProvider("OpenRouterProvider", result="or-ok")
+
+        provider = FailoverLLMProvider([nvidia, openrouter])
+        result = provider.generate("hi")
+
+        assert result == "or-ok"
+
+    def test_nvidia_timeout_falls_back_to_openrouter(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=_generation_error("NVIDIA generation failed: timed out"))
+        openrouter = _FakeProvider("OpenRouterProvider", result="or-ok")
+
+        provider = FailoverLLMProvider([nvidia, openrouter])
+        result = provider.generate("hi")
+
+        assert result == "or-ok"
+
+    def test_nvidia_and_openrouter1_fail_openrouter2_succeeds(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=_generation_error("NVIDIA generation failed: HTTP 429"))
+        or1 = _FakeProvider("OpenRouterProvider", error=_generation_error("OpenRouter generation failed: HTTP 500"))
+        or2 = _FakeProvider("OpenRouterProvider", result="or2-ok")
+
+        provider = FailoverLLMProvider([nvidia, or1, or2])
+        result = provider.generate("hi")
+
+        assert result == "or2-ok"
+        assert nvidia.calls == 1
+        assert or1.calls == 1
+        assert or2.calls == 1
+
+    def test_all_providers_fail_raises_generation_error(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=_generation_error("NVIDIA generation failed: HTTP 429"))
+        or1 = _FakeProvider("OpenRouterProvider", error=_generation_error("OpenRouter generation failed: HTTP 429"))
+
+        provider = FailoverLLMProvider([nvidia, or1])
+
+        with pytest.raises(LLMGenerationError):
+            provider.generate("hi")
+
+    def test_unconfigured_provider_is_skipped(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=LLMConfigurationError("Missing NVIDIA_API_KEY"))
+        openrouter = _FakeProvider("OpenRouterProvider", result="or-ok")
+
+        provider = FailoverLLMProvider([nvidia, openrouter])
+        result = provider.generate("hi")
+
+        assert result == "or-ok"
+
+    def test_no_providers_raises_configuration_error(self) -> None:
+        provider = FailoverLLMProvider([])
+
+        with pytest.raises(LLMConfigurationError):
+            provider.generate("hi")
+
+    def test_api_keys_never_in_logs_or_errors(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", error=_generation_error("NVIDIA generation failed: HTTP 429"))
+        or1 = _FakeProvider("OpenRouterProvider", error=_generation_error("OpenRouter generation failed: HTTP 429"))
+
+        provider = FailoverLLMProvider([nvidia, or1])
+
+        with pytest.raises(LLMGenerationError) as excinfo:
+            provider.generate("hi")
+
+        message = str(excinfo.value)
+        assert "sk-" not in message
+        assert "Bearer" not in message
+        assert "secret" not in message
+
+    def test_timing_instrumentation_preserved(self) -> None:
+        nvidia = _FakeProvider("NvidiaProvider", result="ok")
+
+        provider = FailoverLLMProvider([nvidia])
+        provider.generate("hi")
+
+        assert provider.generate_count == 1
+        assert provider.last_generate_elapsed_s is not None
+        assert provider.last_generate_elapsed_s >= 0

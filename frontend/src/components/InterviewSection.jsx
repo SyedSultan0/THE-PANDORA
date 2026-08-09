@@ -7,6 +7,7 @@ export default function InterviewSection({
   onAnswerChange,
   onSubmit,
   isThinking,
+  loadingPhase = "question", // "question" | "feedback"
 }) {
   const [answerError, setAnswerError] = useState("");
 
@@ -25,6 +26,8 @@ export default function InterviewSection({
     setAnswerError("");
     onSubmit();
   };
+
+  const isFeedback = loadingPhase === "feedback";
 
   return (
     <section className="card interview-section">
@@ -70,9 +73,21 @@ export default function InterviewSection({
       </button>
 
       {isThinking && (
-        <p className="thinking" role="status">
-          Thinking...
-        </p>
+        <div className="thinking" role="status" aria-live="polite">
+          <span className="thinking-spinner" aria-hidden="true" />
+          <div className="thinking-text">
+            <p className="thinking-primary">
+              {isFeedback
+                ? "Preparing your interview feedback..."
+                : "AI interviewer is analyzing your response..."}
+            </p>
+            <p className="thinking-secondary">
+              {isFeedback
+                ? "Analyzing your responses and generating your final report."
+                : "The next question may take a little longer to generate."}
+            </p>
+          </div>
+        </div>
       )}
     </section>
   );

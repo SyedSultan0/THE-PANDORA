@@ -6,7 +6,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.api.routes import create_router
-from app.llm import GeminiProvider, OpenRouterProvider
+from app.llm import (
+    FailoverLLMProvider,
+    GeminiProvider,
+    NvidiaProvider,
+    OpenRouterProvider,
+)
 from app.llm.base import LLMProvider
 
 # Load environment variables from the root .env file (e.g. GEMINI_API_KEY,
@@ -16,14 +21,24 @@ load_dotenv()
 
 
 def build_llm_provider() -> LLMProvider:
-    """Select the LLM provider based on the local configuration.
+    """Build the failover LLM provider chain.
 
-    OpenRouter is used when ``OPENROUTER_API_KEY`` is configured; otherwise
-    Gemini is used as the fallback.
+    Preferred order:
+      1. NVIDIA (primary)
+      2. OpenRouter (multi-key/model failover)
+      3. Gemini (legacy fallback)
+
+    Providers that are not configured (missing API key) are skipped by the
+    failover wrapper, so the chain works with any subset of credentials.
     """
-    if os.getenv("OPENROUTER_API_KEY"):
-        return OpenRouterProvider()
-    return GeminiProvider()
+    providers: list[LLMProvider] = []
+    if os.getenv("NVIDIA_API_KEY"):
+        providers.append(NvidiaProvider())
+    if os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY_1"):
+        providers.append(OpenRouterProvider())
+    if os.getenv("GEMINI_API_KEY"):
+        providers.append(GeminiProvider())
+    return FailoverLLMProvider(providers)
 
 
 app = FastAPI(

@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.context.models import InterviewContext
-from app.interview._parsing import parse_json_object
+from app.interview._parsing import generate_json, parse_json_object
 from app.interview.engine_models import EngineState
 from app.interview.errors import FeedbackValidationError
 from app.interview.models import FeedbackResult
@@ -49,13 +49,8 @@ class FeedbackGenerator:
         """
         prompt = build_feedback_prompt(context, state)
 
-        try:
-            raw = self._llm.generate(prompt)
-        except LLMError:
-            raise  # provider errors propagate unchanged
-
         return self._build_feedback_result(
-            parse_json_object(raw, FeedbackValidationError)
+            generate_json(self._llm, prompt, FeedbackValidationError)
         )
 
     # ------------------------------------------------------------------

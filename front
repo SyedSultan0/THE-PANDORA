@@ -1,0 +1,57 @@
+import { useState } from "react";
+import { CANDIDATES, toCandidateSummary } from "../services/candidates.js";
+
+export default function SessionStart({ selectedCandidateId, onSelectCandidate, onStart, isStarting }) {
+  const [error, setError] = useState("");
+
+  const handleStart = () => {
+    if (!selectedCandidateId) {
+      setError("Please select a candidate profile to begin.");
+      return;
+    }
+    setError("");
+    onStart();
+  };
+
+  return (
+    <section className="card session-start">
+      <h1 className="form-title">Start a New Interview</h1>
+      <p className="card-hint">
+        Select a candidate profile. The AI interviewer will personalize questions based on the
+        candidate's actual curriculum progress.
+      </p>
+
+      <div className="form-field">
+        <label htmlFor="candidate-select">
+          Candidate <span className="required-mark" aria-hidden="true">*</span>
+        </label>
+        <select
+          id="candidate-select"
+          value={selectedCandidateId || ""}
+          onChange={(event) => onSelectCandidate(event.target.value)}
+          disabled={isStarting}
+        >
+          <option value="">Select a candidate...</option>
+          {CANDIDATES.map((candidate) => {
+            const { id, name, jobRole } = toCandidateSummary(candidate);
+            return (
+              <option key={id} value={id}>
+                {name} — {jobRole}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      <button type="button" className="btn btn-primary" onClick={handleStart} disabled={isStarting}>
+        {isStarting ? "Starting..." : "Start Interview"}
+      </button>
+    </section>
+  );
+}

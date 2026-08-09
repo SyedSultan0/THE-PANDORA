@@ -9,7 +9,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.context.models import InterviewContext
-from app.interview._parsing import parse_json_object
+from app.interview._parsing import generate_json, parse_json_object
 from app.interview.errors import QuestionValidationError
 from app.interview.models import GeneratedQuestion
 from app.interview.prompts import build_question_prompt
@@ -41,13 +41,8 @@ class QuestionGenerator:
         """
         prompt = build_question_prompt(context)
 
-        try:
-            raw = self._llm.generate(prompt)
-        except LLMError:
-            raise  # provider errors propagate unchanged
-
         return self._build_generated_question(
-            parse_json_object(raw, QuestionValidationError), context
+            generate_json(self._llm, prompt, QuestionValidationError), context
         )
 
     def _build_generated_question(

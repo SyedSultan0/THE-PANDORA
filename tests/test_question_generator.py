@@ -241,6 +241,62 @@ class TestValidationFailures:
             QuestionGenerator(fake).generate(real_context)
 
 
+class FakeLLMProviderWithQueue(LLMProvider):
+    """Fake provider that returns queued responses in order."""
+
+    def __init__(self, responses: list[str]) -> None:
+        self.responses = list(responses)
+        self.call_count = 0
+        self.last_prompt: str | None = None
+
+    def generate(self, prompt: str) -> str:
+        self.last_prompt = prompt
+        if not self.responses:
+            raise AssertionError("No more queued responses.")
+        self.call_count += 1
+        return self.responses.pop(0)
+
+
+class TestRetryBehavior:
+    """Tests for the bounded retry/recovery logic in generate_json."""
+
+    def test_retry_succeeds_on_second_attempt(self, real_context) -> None:
+        fake = FakeLLMProviderWithQueue(
+            responses=["plain text with no json here", '{"question":"Q","curriculum_day":7,"topic":"T","difficulty":"medium"}']
+        )
+        turn = QuestionGenerator(fake).generate(real_context)
+        assert turn.question == "Q"
+        assert fake.call_count == 2
+
+    def test_retry_exhausted_raises(self, real_context) -> None:
+        fake = FakeLLMProviderWithQueue(responses=["not json", "still not json"])
+        with pytest.raises(QuestionValidationError, match="Expecting value"):
+            QuestionGenerator(fake).generate(real_context)
+        assert fake.call_count == 2
+
+    def test_fenced_json_is_accepted(self, real_context) -> None:
+        fake = FakeLLMProviderWithQueue(
+            responses=['```json\n{"question":"Q","curriculum_day":7,"topic":"T","difficulty":"medium"}\n```']
+        )
+        turn = QuestionGenerator(fake).generate(real_context)
+        assert turn.question == "Q"
+
+    def test_whitespace_around_json_is_accepted(self, real_context) -> None:
+        fake = FakeLLMProviderWithQueue(
+            responses=['  \n\n{"question":"Q","curriculum_day":7,"topic":"T","difficulty":"medium"}  \n']
+        )
+        turn = QuestionGenerator(fake).generate(real_context)
+        assert turn.question == "Q"
+
+    def test_malformed_json_retried(self, real_context) -> None:
+        fake = FakeLLMProviderWithQueue(
+            responses=['{"question":"Q"', '{"question":"Q","curriculum_day":7,"topic":"T","difficulty":"medium"}']
+        )
+        turn = QuestionGenerator(fake).generate(real_context)
+        assert turn.question == "Q"
+        assert fake.call_count == 2
+
+
 class TestProviderErrors:
     """Tests that provider errors propagate cleanly."""
 

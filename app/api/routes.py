@@ -10,7 +10,11 @@ A small, centralized exception-handling layer maps domain and provider errors
 to clean JSON responses so internal details never leak to the client.
 """
 
+import logging
+
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from app.api.models import InterviewRequest, InterviewResponse
 from app.api.session_manager import (
@@ -92,7 +96,9 @@ def create_router(
             raise HTTPException(status_code=400, detail=str(exc)) from None
         except LLMError:
             # Provider failures become a controlled 500; internal details are
-            # never exposed to the client.
+            # never exposed to the client. Log the full traceback server-side
+            # so the underlying cause is visible in the uvicorn terminal.
+            logger.exception("LLM provider error during /api/interview")
             raise HTTPException(status_code=500, detail=_LLM_UNAVAILABLE_DETAIL) from None
 
     def _handle_interview(request: InterviewRequest) -> InterviewResponse:
